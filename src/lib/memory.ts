@@ -29,7 +29,7 @@ export function filterRecalled(all: Memory[], blobIds: string[]) {
   );
 }
 export async function recall(user: string, project: string, query: string) {
-  const all = memories(project);
+  const all = await memories(project);
   const c = client(user, project);
   try {
     const result = await c.recall({ query, limit: 20, maxTokens: 2500 });
@@ -44,7 +44,7 @@ export async function recall(user: string, project: string, query: string) {
 }
 export async function persist(user: string, m: Memory) {
   m.sync = "pending";
-  putMemory(m);
+  await putMemory(m);
   const c = client(user, m.projectId);
   try {
     if (!m.jobId) {
@@ -59,7 +59,7 @@ export async function persist(user: string, m: Memory) {
         { idempotencyKey: m.id },
       );
       m.jobId = accepted.job_id;
-      putMemory(m);
+      await putMemory(m);
     }
     const result = await c.waitForRememberJob(m.jobId, {
       timeoutMs: 20000,
@@ -67,10 +67,10 @@ export async function persist(user: string, m: Memory) {
     });
     m.blobId = result.blob_id;
     m.sync = "saved";
-    putMemory(m);
+    await putMemory(m);
   } catch {
     m.sync = "error";
-    putMemory(m);
+    await putMemory(m);
   } finally {
     c.destroy();
   }
