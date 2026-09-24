@@ -74,4 +74,10 @@ Gemini powers the responses. Walrus Memory stores and recalls persistent memory.
 
 Each confirmed memory has a **View blob** link in the Memory trail. It opens the corresponding mainnet record on [Walruscan](https://walruscan.com/mainnet/accounts). Walrus Memory encrypts the stored payload, so the public page verifies the blob handle and network record; the readable text and conversation context are included in FixTrail’s exported evidence JSON.
 
+## Workspace persistence
+
+FixTrail creates a private workspace for each browser session. Supabase stores the workspace’s users, projects, conversations, and memory receipts; Walrus Memory stores the encrypted memory blobs. The browser keeps only an opaque session cookie.
+
+To open the same workspace on another browser or device, use **Settings & access → Generate access key** and restore that key there. If cookies are cleared, or the app is opened in a new browser without restoring an access key, FixTrail creates a new empty workspace. Access keys are bearer credentials: keep them private and generate a new one if exposed.
+
 Built for **Walrus Session 8: Chatbots That Remember**.
