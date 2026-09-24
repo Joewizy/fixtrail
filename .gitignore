@@ -1,0 +1,30 @@
+node_modules/
+.claude/
+.next/
+.env*
+!.env.example
+data/
+**/build/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# Generated Next.js declarations and exported builds
+next-env.d.ts
+out/
+coverage/
+
+# Local logs, database copies, and credentials
+*.log
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.pem
+*.key
+
+# macOS metadata
+.DS_Store
+._*
