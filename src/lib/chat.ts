@@ -33,6 +33,7 @@ export async function chat(
     source: "web" | "telegram";
   },
 ) {
+  const generationDeadline = Date.now() + 180000;
   const project = await ownedProject(user, input.projectId);
   await rateLimit(user);
   if (!configured())
@@ -53,27 +54,37 @@ export async function chat(
       .filter((m) => m.sessionId === input.sessionId)
       .slice(-16);
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const primaryModel = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+    const primaryModel = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
     const fallbackModel =
-      process.env.GEMINI_FALLBACK_MODEL || "gemini-3.5-flash";
+      process.env.GEMINI_FALLBACK_MODEL || "gemini-3.6-flash";
     const capacityFallbackModel =
-      process.env.GEMINI_CAPACITY_FALLBACK_MODEL || "gemini-3.5-flash-lite";
+      process.env.GEMINI_CAPACITY_FALLBACK_MODEL || "gemini-3.5-flash";
     let response:
       Awaited<ReturnType<typeof ai.models.generateContent>> | undefined;
     let lastError: unknown;
     let usedModel = primaryModel;
+    const models = [primaryModel, fallbackModel, capacityFallbackModel].filter(
+      (value, index, all) => all.indexOf(value) === index,
+    );
     try {
-      for (const model of [
-        primaryModel,
-        fallbackModel,
-        capacityFallbackModel,
-      ].filter((value, index, all) => all.indexOf(value) === index)) {
-        for (let attempt = 1; attempt <= 3; attempt += 1) {
+      for (const [index, model] of models.entries()) {
+        // Reserve time for later models and Walrus writes within the 300-second route limit.
+        const modelDeadline =
+          Date.now() +
+          Math.min(
+            60000,
+            Math.floor(
+              (generationDeadline - Date.now()) / (models.length - index),
+            ),
+          );
+        for (let attempt = 1; attempt <= 2; attempt += 1) {
+          const timeout = modelDeadline - Date.now();
+          if (timeout < 1000) break;
           try {
             response = await ai.models.generateContent({
               model,
               config: {
-                httpOptions: { timeout: 15000 },
+                httpOptions: { timeout },
                 systemInstruction: SYSTEM,
                 responseMimeType: "application/json",
                 responseJsonSchema: {
@@ -125,7 +136,7 @@ export async function chat(
             break;
           } catch (error) {
             lastError = error;
-            if (!isTransientProviderError(error) || attempt === 3) break;
+            if (!isTransientProviderError(error) || attempt === 2) break;
             await new Promise((resolve) =>
               setTimeout(resolve, 500 * 2 ** (attempt - 1)),
             );
@@ -214,10 +225,12 @@ function isTransientProviderError(error: unknown) {
     candidate.status === 429 ||
     candidate.status === 500 ||
     candidate.status === 503 ||
+    candidate.status === 504 ||
     candidate.code === 429 ||
     candidate.code === 500 ||
     candidate.code === 503 ||
-    /\b(429|500|503)\b|UNAVAILABLE|overloaded|capacity/i.test(
+    candidate.code === 504 ||
+    /\b(429|500|503|504)\b|UNAVAILABLE|DEADLINE_EXCEEDED|deadline|timed? ?out|aborted|overloaded|capacity/i.test(
       candidate.message || "",
     )
   );

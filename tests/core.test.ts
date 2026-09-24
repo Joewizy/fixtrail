@@ -7,6 +7,11 @@ process.env.MEMWAL_PRIVATE_KEY = "test-delegate";
 process.env.MEMWAL_ACCOUNT_ID = "test-account";
 const blobs = new Map<string, string[]>();
 let providerCalls = 0;
+let geminiFailures = 0;
+let walrusTimeout = false;
+let walrusCompleted = true;
+let remembers = 0;
+const geminiRequests: string[] = [];
 let store: typeof import("../src/lib/db");
 let chatModule: typeof import("../src/lib/chat");
 let memoryModule: typeof import("../src/lib/memory");
@@ -34,6 +39,7 @@ before(async () => {
       options: { idempotencyKey: string },
     ) => {
       providerCalls++;
+      remembers++;
       const blob = options.idempotencyKey;
       blobs.set(config.namespace, [
         ...(blobs.get(config.namespace) || []),
@@ -41,7 +47,17 @@ before(async () => {
       ]);
       return { job_id: blob };
     },
-    waitForRememberJob: async (job: string) => ({ blob_id: job }),
+    getRememberStatus: async (job: string) =>
+      walrusCompleted
+        ? { status: "done", blob_id: job }
+        : { status: "running" },
+    waitForRememberJob: async (job: string) => {
+      if (walrusTimeout)
+        throw Object.assign(new Error("Receipt wait timed out"), {
+          status: 504,
+        });
+      return { blob_id: job };
+    },
     destroy() {},
   }));
   mock.method(globalThis, "fetch", async (url: string | URL | Request) => {
@@ -49,6 +65,20 @@ before(async () => {
       String(url instanceof Request ? url.url : url),
       /^https:\/\/generativelanguage.googleapis.com\//,
     );
+    geminiRequests.push(String(url instanceof Request ? url.url : url));
+    if (geminiFailures > 0) {
+      geminiFailures--;
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: 504,
+            message: "Deadline expired before operation could complete.",
+            status: "DEADLINE_EXCEEDED",
+          },
+        }),
+        { status: 504, headers: { "Content-Type": "application/json" } },
+      );
+    }
     return new Response(
       JSON.stringify({
         candidates: [
@@ -419,4 +449,92 @@ test("API workspace, project writes, and access restoration use Postgres", async
   );
   assert.equal(restored.status, 200);
   assert.equal((await restored.json()).projects.length, 2);
+});
+
+test("Gemini 504 is retried on the same model before falling back", async () => {
+  const { user } = await store.createSession();
+  const projectId = (await store.projects(user))[0].id;
+  const start = geminiRequests.length;
+  geminiFailures = 1;
+  try {
+    const result = await chatModule.chat(user, {
+      projectId,
+      sessionId: store.id(),
+      text: "Help with a compiler error",
+      memory: false,
+      source: "web",
+    });
+    assert.equal(geminiRequests.length - start, 2);
+    assert.equal(geminiRequests[start], geminiRequests[start + 1]);
+    assert.ok(result.answer.text);
+  } finally {
+    geminiFailures = 0;
+  }
+});
+
+test("persistent Gemini timeouts have bounded retries and release the project lock", async () => {
+  const { user } = await store.createSession();
+  const projectId = (await store.projects(user))[0].id;
+  const start = geminiRequests.length;
+  geminiFailures = 20;
+  try {
+    await assert.rejects(
+      chatModule.chat(user, {
+        projectId,
+        sessionId: store.id(),
+        text: "Help",
+        memory: false,
+        source: "web",
+      }),
+      /Gemini request failed/,
+    );
+    assert.equal(geminiRequests.length - start, 6);
+    assert.deepEqual(await store.messages(projectId), []);
+    await store.withProjectLock(user, projectId, async () => true);
+  } finally {
+    geminiFailures = 0;
+  }
+});
+
+test("late Walrus receipts reconcile without resubmitting and become recallable", async () => {
+  const { user } = await store.createSession();
+  const projectId = (await store.projects(user))[0].id;
+  const m = {
+    id: store.id(),
+    projectId,
+    kind: "resolved" as const,
+    text: "Return a u64 literal",
+    createdAt: store.now(),
+    outdated: false,
+    sync: "pending" as const,
+  };
+  walrusTimeout = true;
+  walrusCompleted = false;
+  const before = remembers;
+  try {
+    const pending = await memoryModule.persist(user, m);
+    assert.equal(pending.sync, "pending");
+    assert.ok(pending.jobId);
+    assert.equal(
+      (await memoryModule.refreshReceipts(user, projectId))[0].sync,
+      "pending",
+    );
+    // Also recover records marked error by the previous version.
+    pending.sync = "error";
+    await store.putMemory(pending);
+    walrusCompleted = true;
+    const refreshed = await store.withProjectLock(user, projectId, () =>
+      memoryModule.refreshReceipts(user, projectId),
+    );
+    assert.equal(refreshed[0].sync, "saved");
+    assert.equal(refreshed[0].blobId, pending.jobId);
+    assert.equal(remembers, before + 1);
+    assert.equal(
+      (await memoryModule.recall(user, projectId, "fix"))[0].id,
+      m.id,
+    );
+  } finally {
+    walrusTimeout = false;
+    walrusCompleted = true;
+  }
 });

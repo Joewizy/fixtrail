@@ -277,7 +277,9 @@ export default function Workspace() {
                   ? "Not synced to Walrus"
                   : m.sync === "error"
                     ? "Write not confirmed"
-                    : "Saving…"}
+                    : m.jobId
+                      ? "Awaiting Walrus confirmation"
+                      : "Saving…"}
           </span>
           {!m.outdated && (
             <button
@@ -297,7 +299,7 @@ export default function Workspace() {
               <History size={13} /> Outdated
             </button>
           )}
-          {!m.outdated && m.sync === "error" && (
+          {!m.outdated && (m.sync === "error" || m.sync === "pending") && (
             <button
               onClick={() =>
                 action(async () => {
@@ -311,8 +313,19 @@ export default function Workspace() {
               }
               disabled={busy}
             >
-              Retry
+              {m.jobId ? "Check receipt" : "Retry"}
             </button>
+          )}
+          {m.sync === "saved" && m.blobId && (
+            <a
+              className="walrus-link"
+              href={`https://walruscan.com/mainnet/blob/${encodeURIComponent(m.blobId)}`}
+              target="_blank"
+              rel="noreferrer"
+              title="Open this confirmed Walrus blob on Walruscan"
+            >
+              <Link2 size={12} /> View blob
+            </a>
           )}
         </div>
       </article>
@@ -506,7 +519,7 @@ export default function Workspace() {
                   </div>
                 </div>
                 <div className="conversation">
-                  {!conversation.length && (
+                  {!conversation.length && !pendingMessage && !busy && (
                     <div className="welcome">
                       <div className="trail-illustration" aria-hidden="true">
                         <div className="trail-line" />

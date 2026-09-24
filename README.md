@@ -38,7 +38,7 @@ Get your Gemini API key from [Google AI Studio](https://aistudio.google.com/apik
 | -------------------- | ------------------------------------------------------ |
 | `DATABASE_URL`       | Supabase Postgres transaction-pooler connection string |
 | `GEMINI_API_KEY`     | Your Gemini API key                                    |
-| `GEMINI_MODEL`       | A model available to your Google account               |
+| `GEMINI_MODEL`       | `gemini-3.5-flash-lite` (default)                       |
 | `MEMWAL_PRIVATE_KEY` | Your Walrus Memory delegate private key                |
 | `MEMWAL_ACCOUNT_ID`  | Your MemWalAccount object ID                           |
 
@@ -71,5 +71,7 @@ Supabase stores application state and memory receipts in the private `fixtrail` 
 Next.js · TypeScript · Supabase Postgres · Gemini · Walrus Memory
 
 Gemini powers the responses. Walrus Memory stores and recalls persistent memory. Both providers must be configured; there is no scripted fallback.
+
+Each confirmed memory has a **View blob** link in the Memory trail. It opens the corresponding mainnet record on [Walruscan](https://walruscan.com/mainnet/accounts). Walrus Memory encrypts the stored payload, so the public page verifies the blob handle and network record; the readable text and conversation context are included in FixTrail’s exported evidence JSON.
 
 Built for **Walrus Session 8: Chatbots That Remember**.

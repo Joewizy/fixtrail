@@ -754,6 +754,19 @@ a svg {
 .memory-bottom button:hover {
   color: var(--blue);
 }
+.memory-bottom .walrus-link {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 3px;
+  color: #6b83a5;
+  font-size: 8px;
+  text-decoration: none;
+}
+.memory-bottom .walrus-link:hover {
+  color: var(--blue);
+  text-decoration: underline;
+}
 .memory-bottom .sync-error {
   color: #c07655;
 }
@@ -840,36 +853,51 @@ a svg {
 .message.assistant .message-avatar {
   background: transparent;
 }
+.message.user {
+  flex-direction: row-reverse;
+}
 .message-body {
   min-width: 0;
   flex: 1;
+}
+.message.user .message-body {
+  flex: 0 1 auto;
+  max-width: 78%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 .message-heading {
   display: flex;
   align-items: center;
   gap: 10px;
   margin: 6px 0 12px;
-  font-size: 11px;
+  font-size: 13px;
+}
+.message.user .message-heading {
+  flex-direction: row-reverse;
 }
 .message-heading span {
-  font-size: 9px;
-  color: #a1acbb;
+  font-size: 11px;
+  color: #97a3b3;
 }
 .message-text {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 12px;
-  line-height: 1.9;
-  color: #526680;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ink);
+}
+.message.user .message-text {
+  background: var(--light-blue);
+  color: var(--ink);
+  border: 1px solid #d5e2fb;
+  border-radius: 14px 14px 4px 14px;
+  padding: 10px 14px;
+  text-align: left;
 }
 .pending-message {
   opacity: 0.72;
-}
-.pending-message .message-text {
-  background: #f5f8fd;
-  border: 1px solid #e4ebf5;
-  border-radius: 8px;
-  padding: 10px 12px;
 }
 .recalled {
   border: 1px solid #e1e9f6;
@@ -1485,7 +1513,7 @@ a svg {
     justify-content: center;
   }
   .message-text {
-    font-size: 12px;
+    font-size: 15px;
   }
   .error-banner {
     padding: 12px 20px;

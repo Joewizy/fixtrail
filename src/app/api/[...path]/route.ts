@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { chat, factSchema } from "@/lib/chat";
-import { configured, persist } from "@/lib/memory";
+import { configured, persist, refreshReceipts } from "@/lib/memory";
 import {
   telegramLinked,
   createTelegramLink,
@@ -28,7 +28,19 @@ async function snapshot(user: string) {
   const ps = await projects(user);
   return {
     projects: ps,
-    memories: (await Promise.all(ps.map((p) => memories(p.id)))).flat(),
+    memories: (
+      await Promise.all(
+        ps.map(async (p) => {
+          try {
+            return await withProjectLock(user, p.id, () =>
+              refreshReceipts(user, p.id),
+            );
+          } catch {
+            return memories(p.id);
+          }
+        }),
+      )
+    ).flat(),
     messages: (await Promise.all(ps.map((p) => messages(p.id)))).flat(),
     configured: configured(),
     telegramLinked: await telegramLinked(user),

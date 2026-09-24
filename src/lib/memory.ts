@@ -28,8 +28,42 @@ export function filterRecalled(all: Memory[], blobIds: string[]) {
       Boolean(m.blobId && blobIds.includes(m.blobId)),
   );
 }
-export async function recall(user: string, project: string, query: string) {
+// The caller holds the project lock so a late receipt cannot undo a clear/outdate action.
+export async function refreshReceipts(user: string, project: string) {
   const all = await memories(project);
+  const outstanding = all.filter(
+    (m) =>
+      m.jobId && !m.outdated && (m.sync === "pending" || m.sync === "error"),
+  );
+  if (!outstanding.length || !configured()) return all;
+  const c = client(user, project);
+  try {
+    for (const m of outstanding) {
+      try {
+        const status = await c.getRememberStatus(m.jobId!);
+        if (status.status === "done" && status.blob_id) {
+          m.blobId = status.blob_id;
+          m.sync = "saved";
+        } else if (
+          status.status === "failed" ||
+          status.status === "not_found"
+        ) {
+          m.sync = "error";
+        } else {
+          m.sync = "pending";
+        }
+        await putMemory(m);
+      } catch {
+        // Keep the last known state when the status service is unavailable.
+      }
+    }
+  } finally {
+    c.destroy();
+  }
+  return all;
+}
+export async function recall(user: string, project: string, query: string) {
+  const all = await refreshReceipts(user, project);
   const c = client(user, project);
   try {
     const result = await c.recall({ query, limit: 20, maxTokens: 2500 });
@@ -65,11 +99,15 @@ export async function persist(user: string, m: Memory) {
       timeoutMs: 20000,
       pollIntervalMs: 1000,
     });
+    if (!result.blob_id) throw new Error("Walrus receipt has no blob ID");
     m.blobId = result.blob_id;
     m.sync = "saved";
     await putMemory(m);
-  } catch {
-    m.sync = "error";
+  } catch (error) {
+    m.sync =
+      m.jobId && (error as { status?: number }).status === 504
+        ? "pending"
+        : "error";
     await putMemory(m);
   } finally {
     c.destroy();
