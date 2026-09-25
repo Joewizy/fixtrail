@@ -1,12 +1,12 @@
 # FixTrail
 
-**Stop debugging the same problem twice.**
+**An AI troubleshooting partner that remembers your project.**
 
-FixTrail is an AI troubleshooting assistant for developers. It keeps a record of your environment, failed attempts, and working fixes so each conversation can pick up where the last one ended.
+FixTrail helps developers carry project context forward as their work evolves. It remembers your environment, the approaches you have explored, failed attempts, and confirmed fixes so new conversations can build on what you have already learned.
 
 ## How it works
 
-Create a project and describe the issue. As you work through it, FixTrail builds a memory trail of what you suggested, tried, and resolved. When the issue comes back, that history helps guide the next answer.
+Create a project and describe what you are working through. With memory enabled, FixTrail builds a visible trail of project context, suggestions, attempts, and confirmed outcomes. In later conversations within the same project and workspace, it retrieves relevant saved facts to help guide the next step.
 
 - **Project memory** — keep troubleshooting context across conversations.
 - **A visible memory trail** — review saved context and mark outdated information.
@@ -79,5 +79,13 @@ Each confirmed memory has a **View blob** link in the Memory trail. It opens the
 FixTrail creates a private workspace for each browser session. Supabase stores the workspace’s users, projects, conversations, and memory receipts; Walrus Memory stores the encrypted memory blobs. The browser keeps only an opaque session cookie.
 
 To open the same workspace on another browser or device, use **Settings & access → Generate access key** and restore that key there. If cookies are cleared, or the app is opened in a new browser without restoring an access key, FixTrail creates a new empty workspace. Access keys are bearer credentials: keep them private and generate a new one if exposed.
+
+Memory is scoped to each project within its workspace:
+
+- **New conversation, same project and workspace:** with memory enabled, FixTrail can recall relevant confirmed memories from earlier conversations.
+- **Same workspace restored on another browser or device:** its existing projects and saved memories remain available.
+- **Different workspace or project:** memories are separate and are not automatically shared. Creating a new workspace does not erase the original workspace's saved memories; restore the original workspace to access them.
+
+FixTrail recalls selected facts, not every previous message. Memories must have a confirmed Walrus save and must not be marked outdated to be included in recall.
 
 Built for **Walrus Session 8: Chatbots That Remember**.
